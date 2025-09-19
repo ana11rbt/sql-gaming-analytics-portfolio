@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Business Context: Understanding player demographics, engagement, and revenue patterns
 -- Data Source: Simulated gaming data based on industry experience
--- Author: Ana Trbić | Gaming Analytics Portfolio
+-- Author: Ana Rajić | Gaming Analytics Portfolio
 -- ============================================================================
 
 -- DATA MODEL:
