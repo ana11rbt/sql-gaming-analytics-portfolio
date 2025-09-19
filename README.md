@@ -24,10 +24,10 @@ This repository contains **SQL-based analytics projects** focused on gaming indu
 
 ## 📊 Featured Projects
 
-### 1. Player Retention & Cohort Analysis
-**Business Context**: Analyzing player drop-off patterns to optimize onboarding and long-term engagement  
-**Key Metrics**: D1/D7/D30 retention, cohort LTV, churn prediction  
-**Tools**: Advanced SQL window functions, cohort modeling  
+### 1. Player Retention & Engagement Analysis
+**Business Context**: Analyzing player demographics, engagement patterns, and basic retention indicators  
+**Key Metrics**: Platform performance, acquisition source quality, player activity rates  
+**Tools**: SQL JOINs, aggregations, player segmentation  
 [→ View Analysis](queries/retention-analysis.sql)
 
 ### 2. Combat & Progression Analytics  
