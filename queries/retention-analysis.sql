@@ -1,181 +1,157 @@
--- Player Retention & Cohort Analysis
--- Business Context: Analyzing player drop-off patterns to optimize onboarding
--- Key Metrics: D1/D7/D30 retention, cohort LTV, churn prediction
-
--- -- ============================================================================
--- PLAYER RETENTION & COHORT ANALYSIS
+-- ============================================================================
+-- PLAYER RETENTION ANALYSIS 
 -- ============================================================================
 -- Business Context: Analyzing player drop-off patterns to optimize onboarding
--- Key Metrics: D1/D7/D30 retention, cohort LTV, churn prediction
+-- Data Source: Simulated gaming industry data based on mobile gaming benchmarks  
 -- Author: Ana Trbić | Gaming Analytics Portfolio
 -- ============================================================================
 
--- DATA MODEL ASSUMPTIONS:
+-- DATA MODEL:
 -- players: player_id, install_date, platform, country, acquisition_source
 -- sessions: session_id, player_id, session_date, session_duration_min
 -- transactions: transaction_id, player_id, transaction_date, amount_usd
 
 -- ============================================================================
--- 1. COHORT RETENTION ANALYSIS
--- ============================================================================
-
-WITH player_install_cohorts AS (
-    -- Define install cohorts by week
-    SELECT 
-        player_id,
-        install_date,
-        DATE_FORMAT(install_date, '%Y-%u') as install_week,
-        platform,
-        acquisition_source
-    FROM players
-),
-
-player_activity AS (
-    -- Track all player activity sessions
-    SELECT 
-        p.player_id,
-        p.install_date,
-        p.install_week,
-        s.session_date,
-        DATEDIFF(s.session_date, p.install_date) as days_since_install
-    FROM player_install_cohorts p
-    JOIN sessions s ON p.player_id = s.player_id
-),
-
-retention_metrics AS (
-    -- Calculate retention flags for each player
-    SELECT 
-        player_id,
-        install_date,
-        install_week,
-        MAX(CASE WHEN days_since_install = 1 THEN 1 ELSE 0 END) as returned_d1,
-        MAX(CASE WHEN days_since_install = 7 THEN 1 ELSE 0 END) as returned_d7,
-        MAX(CASE WHEN days_since_install = 30 THEN 1 ELSE 0 END) as returned_d30
-    FROM player_activity
-    GROUP BY player_id, install_date, install_week
-)
-
--- FINAL COHORT RETENTION REPORT
-SELECT 
-    install_week,
-    COUNT(DISTINCT rm.player_id) as cohort_size,
-    
-    -- Retention rates
-    ROUND(AVG(returned_d1) * 100, 2) as d1_retention_pct,
-    ROUND(AVG(returned_d7) * 100, 2) as d7_retention_pct,
-    ROUND(AVG(returned_d30) * 100, 2) as d30_retention_pct,
-    
-    -- Absolute numbers
-    SUM(returned_d1) as d1_retained_players,
-    SUM(returned_d7) as d7_retained_players,
-    SUM(returned_d30) as d30_retained_players
-
-FROM retention_metrics rm
-GROUP BY install_week
-ORDER BY install_week DESC;
-
--- ============================================================================
--- 2. RETENTION BY ACQUISITION SOURCE
+-- 1. MONTHLY RETENTION OVERVIEW
 -- ============================================================================
 
 SELECT 
-    pic.acquisition_source,
-    COUNT(DISTINCT pic.player_id) as total_players,
+    DATE_FORMAT(p.install_date, '%Y-%m') as install_month,
+    COUNT(DISTINCT p.player_id) as total_installs,
     
-    -- Retention performance by source
-    ROUND(AVG(rm.returned_d1) * 100, 2) as d1_retention_pct,
-    ROUND(AVG(rm.returned_d7) * 100, 2) as d7_retention_pct,
-    ROUND(AVG(rm.returned_d30) * 100, 2) as d30_retention_pct,
+    -- Players who returned on Day 1
+    COUNT(DISTINCT CASE 
+        WHEN DATEDIFF(s.session_date, p.install_date) = 1 
+        THEN p.player_id 
+    END) as d1_returning_players,
     
-    -- Quality score (weighted retention)
+    -- Players who returned on Day 7
+    COUNT(DISTINCT CASE 
+        WHEN DATEDIFF(s.session_date, p.install_date) = 7 
+        THEN p.player_id 
+    END) as d7_returning_players,
+    
+    -- Retention percentages
     ROUND(
-        (AVG(rm.returned_d1) * 0.3 + 
-         AVG(rm.returned_d7) * 0.5 + 
-         AVG(rm.returned_d30) * 0.2) * 100, 2
-    ) as retention_quality_score
+        COUNT(DISTINCT CASE WHEN DATEDIFF(s.session_date, p.install_date) = 1 THEN p.player_id END) * 100.0 
+        / COUNT(DISTINCT p.player_id), 2
+    ) as d1_retention_pct,
+    
+    ROUND(
+        COUNT(DISTINCT CASE WHEN DATEDIFF(s.session_date, p.install_date) = 7 THEN p.player_id END) * 100.0 
+        / COUNT(DISTINCT p.player_id), 2
+    ) as d7_retention_pct
 
-FROM player_install_cohorts pic
-JOIN retention_metrics rm ON pic.player_id = rm.player_id
-GROUP BY pic.acquisition_source
-ORDER BY retention_quality_score DESC;
+FROM players p
+LEFT JOIN sessions s ON p.player_id = s.player_id
+GROUP BY DATE_FORMAT(p.install_date, '%Y-%m')
+ORDER BY install_month DESC;
 
 -- ============================================================================
--- 3. REVENUE-COHORT ANALYSIS
--- ============================================================================
-
-WITH revenue_cohorts AS (
-    SELECT 
-        pic.player_id,
-        pic.install_week,
-        rm.returned_d7,
-        rm.returned_d30,
-        COALESCE(SUM(t.amount_usd), 0) as total_revenue,
-        COUNT(t.transaction_id) as total_transactions
-    FROM player_install_cohorts pic
-    JOIN retention_metrics rm ON pic.player_id = rm.player_id
-    LEFT JOIN transactions t ON pic.player_id = t.player_id
-    GROUP BY pic.player_id, pic.install_week, rm.returned_d7, rm.returned_d30
-)
-
-SELECT 
-    install_week,
-    
-    -- Revenue metrics
-    ROUND(AVG(total_revenue), 2) as avg_revenue_per_user,
-    ROUND(AVG(CASE WHEN total_revenue > 0 THEN total_revenue END), 2) as avg_revenue_per_payer,
-    ROUND(AVG(CASE WHEN returned_d7 = 1 THEN total_revenue END), 2) as avg_revenue_d7_retained,
-    
-    -- Conversion rates
-    ROUND(AVG(CASE WHEN total_revenue > 0 THEN 1 ELSE 0 END) * 100, 2) as conversion_rate_pct,
-    
-    -- Retention-Revenue correlation
-    ROUND(AVG(CASE WHEN returned_d7 = 1 AND total_revenue > 0 THEN 1 ELSE 0 END) * 100, 2) as d7_payer_rate
-
-FROM revenue_cohorts
-GROUP BY install_week
-ORDER BY install_week DESC;
-
--- ============================================================================
--- 4. CHURN RISK PREDICTION
+-- 2. ACQUISITION SOURCE PERFORMANCE
 -- ============================================================================
 
 SELECT 
-    pic.player_id,
-    pic.install_date,
-    DATEDIFF(CURRENT_DATE, MAX(s.session_date)) as days_since_last_session,
-    COUNT(DISTINCT s.session_date) as total_session_days,
-    AVG(s.session_duration_min) as avg_session_duration,
-    COALESCE(SUM(t.amount_usd), 0) as total_spent,
+    p.acquisition_source,
+    COUNT(DISTINCT p.player_id) as total_players,
     
-    -- Churn risk classification
+    -- Week 1 activity (Days 1-7)
+    COUNT(DISTINCT CASE 
+        WHEN DATEDIFF(s.session_date, p.install_date) BETWEEN 1 AND 7 
+        THEN p.player_id 
+    END) as week1_active_players,
+    
+    -- Week 1 retention rate
+    ROUND(
+        COUNT(DISTINCT CASE WHEN DATEDIFF(s.session_date, p.install_date) BETWEEN 1 AND 7 THEN p.player_id END) * 100.0 
+        / COUNT(DISTINCT p.player_id), 2
+    ) as week1_retention_pct,
+    
+    -- Average sessions in first week
+    ROUND(
+        COUNT(CASE WHEN DATEDIFF(s.session_date, p.install_date) BETWEEN 0 AND 7 THEN s.session_id END) * 1.0
+        / COUNT(DISTINCT p.player_id), 1
+    ) as avg_sessions_week1
+
+FROM players p
+LEFT JOIN sessions s ON p.player_id = s.player_id
+GROUP BY p.acquisition_source
+ORDER BY week1_retention_pct DESC;
+
+-- ============================================================================
+-- 3. REVENUE CORRELATION WITH RETENTION
+-- ============================================================================
+
+SELECT 
+    -- Player retention segments
     CASE 
+        WHEN MAX(DATEDIFF(s.session_date, p.install_date)) >= 30 THEN '30+ Day Players'
+        WHEN MAX(DATEDIFF(s.session_date, p.install_date)) >= 7 THEN '7-29 Day Players'
+        WHEN MAX(DATEDIFF(s.session_date, p.install_date)) >= 1 THEN '1-6 Day Players'
+        ELSE 'Day 0 Only'
+    END as retention_segment,
+    
+    COUNT(DISTINCT p.player_id) as total_players,
+    COUNT(DISTINCT t.player_id) as paying_players,
+    COALESCE(SUM(t.amount_usd), 0) as total_revenue,
+    
+    -- Key metrics
+    ROUND(COALESCE(SUM(t.amount_usd), 0) / COUNT(DISTINCT p.player_id), 2) as revenue_per_user,
+    ROUND(COUNT(DISTINCT t.player_id) * 100.0 / COUNT(DISTINCT p.player_id), 2) as conversion_rate_pct
+
+FROM players p
+LEFT JOIN sessions s ON p.player_id = s.player_id
+LEFT JOIN transactions t ON p.player_id = t.player_id
+GROUP BY retention_segment
+ORDER BY revenue_per_user DESC;
+
+-- ============================================================================
+-- 4. CHURN RISK IDENTIFICATION
+-- ============================================================================
+
+SELECT 
+    p.player_id,
+    p.install_date,
+    p.acquisition_source,
+    MAX(s.session_date) as last_session_date,
+    DATEDIFF(CURRENT_DATE, MAX(s.session_date)) as days_since_last_session,
+    COUNT(DISTINCT s.session_date) as total_active_days,
+    COALESCE(SUM(t.amount_usd), 0) as total_revenue,
+    
+    -- Risk classification
+    CASE 
+        WHEN DATEDIFF(CURRENT_DATE, MAX(s.session_date)) > 30 THEN 'Churned'
         WHEN DATEDIFF(CURRENT_DATE, MAX(s.session_date)) > 14 THEN 'High Risk'
         WHEN DATEDIFF(CURRENT_DATE, MAX(s.session_date)) > 7 THEN 'Medium Risk'
-        WHEN DATEDIFF(CURRENT_DATE, MAX(s.session_date)) > 3 THEN 'Low Risk'
         ELSE 'Active'
-    END as churn_risk_category
+    END as churn_risk_level
 
-FROM player_install_cohorts pic
-LEFT JOIN sessions s ON pic.player_id = s.player_id
-LEFT JOIN transactions t ON pic.player_id = t.player_id
-GROUP BY pic.player_id, pic.install_date
-HAVING total_session_days > 0
-ORDER BY days_since_last_session DESC, total_spent DESC;
+FROM players p
+LEFT JOIN sessions s ON p.player_id = s.player_id
+LEFT JOIN transactions t ON p.player_id = t.player_id
+GROUP BY p.player_id, p.install_date, p.acquisition_source
+HAVING COUNT(s.session_id) > 0  -- Only players with at least one session
+ORDER BY total_revenue DESC, days_since_last_session ASC;
 
 -- ============================================================================
--- BUSINESS INSIGHTS SUMMARY
+-- BUSINESS INSIGHTS & RECOMMENDATIONS
 -- ============================================================================
--- 
--- KEY FINDINGS (Based on Analysis):
--- 1. Cohort retention trends identify best/worst performing install periods
--- 2. Acquisition source quality reveals optimal marketing channel allocation  
--- 3. Revenue-retention correlation shows LTV impact of retention improvements
--- 4. Churn risk segmentation enables proactive re-engagement campaigns
 --
--- ACTIONABLE RECOMMENDATIONS:
--- - Focus marketing spend on highest-retention acquisition sources
--- - Implement targeted onboarding for cohorts with <X% D1 retention
--- - Deploy re-engagement campaigns for "Medium Risk" churn segment
--- - Optimize early monetization for D7+ retained players
+-- Key Questions Answered:
+-- 1. Which install periods show strongest/weakest retention trends?
+-- 2. Which acquisition sources deliver highest-quality long-term players?
+-- 3. How does player retention correlate with monetization success?
+-- 4. Which players are at risk of churning and need re-engagement?
 --
+-- Actionable Recommendations:
+-- • Reallocate marketing budget toward acquisition sources with highest Week 1 retention
+-- • Implement onboarding improvements for install cohorts showing <X% D1 retention  
+-- • Deploy targeted re-engagement campaigns for "Medium Risk" and "High Risk" players
+-- • Analyze behavioral differences between "30+ Day Players" and shorter-term segments
+-- • Focus early monetization efforts on players showing strong engagement patterns
+--
+-- Business Impact:
+-- • Improved retention rates directly increase player LTV and reduce acquisition costs
+-- • Churn prediction enables proactive retention campaigns vs reactive measures
+-- • Acquisition source optimization maximizes ROI on marketing spend
 -- ============================================================================
