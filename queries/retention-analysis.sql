@@ -51,16 +51,16 @@ ORDER BY total_players DESC;
 -- ============================================================================
 
 SELECT 
-    p.player_id,
-    p.platform,
-    p.acquisition_source,
-    COUNT(s.session_id) as total_sessions,
-    ROUND(AVG(s.session_duration_min), 1) as avg_session_duration,
-    MIN(s.session_date) as first_session,
-    MAX(s.session_date) as last_session,
-    DATEDIFF(MAX(s.session_date), MIN(s.session_date)) as days_active
-FROM players p
-JOIN sessions s ON p.player_id = s.player_id
+	p.player_id,
+	p.platform,
+	p.acquisition_source,
+	COUNT(s.session_id) AS total_sessions,
+	ROUND(AVG(s.session_duration_min), 1) AS avg_session_duration,
+	MIN(s.session_date) AS first_session,
+	MAX(s.session_date) AS last_session,
+	DATEDIFF(DAY, MIN(s.session_date), MAX(s.session_date)) AS days_active
+FROM dbo.players p
+JOIN dbo.sessions s ON p.player_id = s.player_id
 GROUP BY p.player_id, p.platform, p.acquisition_source
 ORDER BY total_sessions DESC, avg_session_duration DESC;
 
