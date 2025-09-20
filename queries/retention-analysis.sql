@@ -22,17 +22,15 @@ SELECT
     COUNT(DISTINCT acquisition_source) as marketing_channels,
     MIN(install_date) as first_install,
     MAX(install_date) as most_recent_install
-FROM players;
+FROM dbo.players;
 
 -- ============================================================================
 -- 2. PLATFORM DISTRIBUTION ANALYSIS
 -- ============================================================================
 
-SELECT 
-    platform,
-    COUNT(*) as player_count,
-    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM players), 2) as percentage_of_players
-FROM players
+SELECT platform,
+	COUNT(*) AS player_count
+FROM dbo.players
 GROUP BY platform
 ORDER BY player_count DESC;
 
