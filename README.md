@@ -24,11 +24,11 @@ This repository contains **SQL-based analytics projects** focused on gaming indu
 
 ## 📊 Featured Projects
 
-### 1. Player Retention & Engagement Analysis
-**Business Context**: Analyzing player demographics, engagement patterns, and basic retention indicators  
+### 1. Player Behaviour Analysis
+**Business Context**: Analysing player demographics, engagement patterns, and basic retention indicators  
 **Key Metrics**: Platform performance, acquisition source quality, player activity rates  
 **Tools**: SQL JOINs, aggregations, player segmentation  
-[→ View Analysis](queries/retention-analysis.sql)
+[→ View Analysis](queries/player-behavior-overview.sql)
 
 ### 2. Combat & Progression Analytics  
 **Business Context**: Difficulty balancing and progression pacing for action games  
