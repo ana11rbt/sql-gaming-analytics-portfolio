@@ -89,13 +89,13 @@ ORDER BY total_revenue DESC;
 
 SELECT 
     p.platform,
-    COUNT(DISTINCT p.player_id) as total_players,
-    COUNT(DISTINCT t.player_id) as paying_players,
-    COALESCE(SUM(t.amount_usd), 0) as total_revenue,
-    ROUND(COALESCE(SUM(t.amount_usd), 0) / COUNT(DISTINCT p.player_id), 2) as revenue_per_user,
-    ROUND(COUNT(DISTINCT t.player_id) * 100.0 / COUNT(DISTINCT p.player_id), 2) as conversion_rate_pct
-FROM players p
-LEFT JOIN transactions t ON p.player_id = t.player_id
+    COUNT(DISTINCT p.player_id) AS total_players,
+    COUNT(DISTINCT t.player_id) AS paying_players,
+    COALESCE(SUM(t.amount_usd), 0) AS total_revenue,
+    ROUND(COALESCE(SUM(t.amount_usd), 0) / COUNT(DISTINCT p.player_id), 2) AS revenue_per_user,
+    ROUND(CAST(COUNT(DISTINCT t.player_id) AS FLOAT) * 100.0 / COUNT(DISTINCT p.player_id), 2) AS conversion_rate_pct
+FROM dbo.players p
+LEFT JOIN dbo.transactions t ON p.player_id = t.player_id
 GROUP BY p.platform
 ORDER BY revenue_per_user DESC;
 
@@ -103,18 +103,18 @@ ORDER BY revenue_per_user DESC;
 -- 7. ACQUISITION SOURCE QUALITY
 -- ============================================================================
 
-SELECT 
-    p.acquisition_source,
-    COUNT(DISTINCT p.player_id) as players_acquired,
-    COUNT(DISTINCT s.player_id) as active_players,
-    COUNT(DISTINCT t.player_id) as paying_players,
-    ROUND(COUNT(DISTINCT s.player_id) * 100.0 / COUNT(DISTINCT p.player_id), 2) as activity_rate_pct,
-    ROUND(COUNT(DISTINCT t.player_id) * 100.0 / COUNT(DISTINCT p.player_id), 2) as conversion_rate_pct
-FROM players p
-LEFT JOIN sessions s ON p.player_id = s.player_id
-LEFT JOIN transactions t ON p.player_id = t.player_id
+SELECT
+	p.acquisition_source,
+	COUNT(DISTINCT p.player_id) AS players_acquired,
+	COUNT(DISTINCT s.player_id) AS active_players,
+	COUNT(DISTINCT t.player_id) AS paying_players,
+	CAST(COUNT(DISTINCT s.player_id) AS FLOAT) * 100.0 / COUNT(DISTINCT p.player_id) AS activity_rate_pct,
+	CAST(COUNT(DISTINCT t.player_id) AS FLOAT) * 100.0 / COUNT(DISTINCT p.player_id) AS conversion_rate_pct
+FROM dbo.players p
+LEFT JOIN dbo.sessions s ON p.player_id = s.player_id
+LEFT JOIN dbo.transactions t ON p.player_id = t.player_id
 GROUP BY p.acquisition_source
-ORDER BY conversion_rate_pct DESC;
+ORDER BY conversion_rate_pct DESC; 
 
 -- ============================================================================
 -- BUSINESS INSIGHTS & RECOMMENDATIONS
